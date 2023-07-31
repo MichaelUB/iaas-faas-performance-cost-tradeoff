@@ -1,0 +1,297 @@
+# MAS ETH Applied Technology, Michael Bürgi 08 607 509
+# Master Thesis "Cloud Architecture Paradigms: A Comparative Study of IaaS and FaaS for Workload Performance and Cost"
+
+import pandas as pd
+
+
+
+
+###################### Section: Invocations Per Function ######################
+
+# List of file names for all the files
+file_names = [
+    "invocations_per_function_md.anon.d01.csv",
+    "invocations_per_function_md.anon.d02.csv",
+    "invocations_per_function_md.anon.d03.csv",
+    "invocations_per_function_md.anon.d04.csv",
+    "invocations_per_function_md.anon.d05.csv",
+    "invocations_per_function_md.anon.d06.csv",
+    "invocations_per_function_md.anon.d07.csv",
+    "invocations_per_function_md.anon.d08.csv",
+    "invocations_per_function_md.anon.d09.csv",
+    "invocations_per_function_md.anon.d10.csv",
+    "invocations_per_function_md.anon.d11.csv",
+    "invocations_per_function_md.anon.d12.csv"
+]
+
+# Create an empty DataFrame to store unique combinations
+unique_combinations_df = pd.DataFrame(columns=["HashOwner", "HashApp", "HashFunction"])
+
+# Iterate through all the files and extract unique combinations
+for file_name in file_names:
+    file_path = file_name
+    df = pd.read_csv(file_path)
+    unique_combinations_df = pd.concat([unique_combinations_df, df[["HashOwner", "HashApp", "HashFunction"]]], ignore_index=True)
+
+# Drop duplicates to get the unique combinations
+unique_combinations_df = unique_combinations_df.drop_duplicates()
+
+# Create a reduced DataFrame based on unique combinations and add a SumOfInvocations column
+reduced_df = unique_combinations_df.copy()
+reduced_df["SumOfInvocations"] = 0
+
+# Write the reduced DataFrame to reduced_dataframe.csv as a starting point
+reduced_output_file_path = "reduced_dataframe.csv"
+reduced_df.to_csv(reduced_output_file_path, index=False)
+
+# Read the first file of function invocations set
+file_path = "invocations_per_function_md.anon.d01.csv"
+df = pd.read_csv(file_path)
+
+# Calculate the sum of invocations and rename the column for the first file
+df["SumOfInvocationsd01"] = df.iloc[:, 4:].sum(axis=1)
+
+# Select the required columns for the testfile.csv
+selected_columns = ["HashOwner", "HashApp", "HashFunction", "Trigger", "SumOfInvocationsd01"]
+df = df[selected_columns]
+
+# Write to the new file "testfile.csv" as a basis for the remaining files
+output_file_path = "testfile.csv"
+df.to_csv(output_file_path, index=False)
+
+# List of file names for the remaining files
+file_names = [
+    "invocations_per_function_md.anon.d02.csv",
+    "invocations_per_function_md.anon.d03.csv",
+    "invocations_per_function_md.anon.d04.csv",
+    "invocations_per_function_md.anon.d05.csv",
+    "invocations_per_function_md.anon.d06.csv",
+    "invocations_per_function_md.anon.d07.csv",
+    "invocations_per_function_md.anon.d08.csv",
+    "invocations_per_function_md.anon.d09.csv",
+    "invocations_per_function_md.anon.d10.csv",
+    "invocations_per_function_md.anon.d11.csv",
+    "invocations_per_function_md.anon.d12.csv"
+]
+
+# Iterate through the remaining files and merge the data into testfile.csv
+for file_name in file_names:
+    file_path = file_name
+    df = pd.read_csv(file_path)
+    df[f"SumOfInvocations{file_name[-7:-4]}"] = df.iloc[:, 4:].sum(axis=1)
+    selected_columns = ["HashOwner", "HashApp", "HashFunction", f"SumOfInvocations{file_name[-7:-4]}"]
+    df = df[selected_columns]
+    merged_df = pd.read_csv(output_file_path)
+    merged_df = merged_df.merge(df, on=["HashOwner", "HashApp", "HashFunction"], how="left")
+    merged_df.rename(columns={f"SumOfInvocations{file_name[-7:-4]}": f"SumOfInvocations{file_name[-7:-4]}"}, inplace=True)
+    merged_df.to_csv(output_file_path, index=False)
+
+# Replace NaN with 0 in columns SumOfInvocationsd01 to SumOfInvocationsd12
+merged_df.iloc[:, 4:16] = merged_df.iloc[:, 4:16].fillna(0)
+
+# Calculate the sum of columns SumOfInvocationsd01 to SumOfInvocationsd12
+merged_df["SumOfInvocationsd01d12"] = merged_df.iloc[:, 4:16].sum(axis=1)
+
+# Write the updated DataFrame back to testfile.csv
+merged_df.to_csv(output_file_path, index=False)
+
+# Read the existing testfile.csv
+output_file_path = "testfile.csv"
+df = pd.read_csv(output_file_path)
+
+# Calculate SumOfInvocations30Days and add it as a new column
+df["SumOfInvocations30Days"] = df["SumOfInvocationsd01d12"] / 12 * 30
+
+# Write the updated DataFrame back to testfile.csv
+df.to_csv(output_file_path, index=False)
+
+
+
+
+###################### Section: Application Memory Percentiles ######################
+
+# Process the files from the "app_memory_percentiles" group; no need to start with one as structure given above
+file_names_memory = [
+    "app_memory_percentiles.anon.d01.csv",
+    "app_memory_percentiles.anon.d02.csv",
+    "app_memory_percentiles.anon.d03.csv",
+    "app_memory_percentiles.anon.d04.csv",
+    "app_memory_percentiles.anon.d05.csv",
+    "app_memory_percentiles.anon.d06.csv",
+    "app_memory_percentiles.anon.d07.csv",
+    "app_memory_percentiles.anon.d08.csv",
+    "app_memory_percentiles.anon.d09.csv",
+    "app_memory_percentiles.anon.d10.csv",
+    "app_memory_percentiles.anon.d11.csv",
+    "app_memory_percentiles.anon.d12.csv"
+]
+
+# Iterate through the memory files and merge the data into testfile.csv
+for file_name_memory in file_names_memory:
+    file_path_memory = file_name_memory
+    df_memory = pd.read_csv(file_path_memory)
+    df_memory_selected = df_memory[["HashOwner", "HashApp", "AverageAllocatedMb_pct100"]]
+    merged_df = pd.read_csv(output_file_path)
+    merged_df = merged_df.merge(df_memory_selected, on=["HashOwner", "HashApp"], how="left")
+    merged_df.rename(columns={"AverageAllocatedMb_pct100": f"AverageAllocatedMb_pct100{file_name_memory[-7:-4]}"}, inplace=True)
+
+    # Replace NaN values with 0 in the merged DataFrame
+    merged_df.iloc[:, -1] = merged_df.iloc[:, -1].fillna(0)
+
+    merged_df.to_csv(output_file_path, index=False)
+
+# Calculate the highest value of columns AverageAllocatedMb_pct100d01 to AverageAllocatedMb_pct100d12
+merged_df["HighestAverageAllocatedMb_pct100d01d12"] = merged_df.iloc[:, 18:].max(axis=1)
+
+# Write the updated DataFrame back to testfile.csv
+merged_df.to_csv(output_file_path, index=False)
+
+
+# Process the files from the "app_memory_percentiles" group
+file_names_memory = [
+    "app_memory_percentiles.anon.d01.csv",
+    "app_memory_percentiles.anon.d02.csv",
+    "app_memory_percentiles.anon.d03.csv",
+    "app_memory_percentiles.anon.d04.csv",
+    "app_memory_percentiles.anon.d05.csv",
+    "app_memory_percentiles.anon.d06.csv",
+    "app_memory_percentiles.anon.d07.csv",
+    "app_memory_percentiles.anon.d08.csv",
+    "app_memory_percentiles.anon.d09.csv",
+    "app_memory_percentiles.anon.d10.csv",
+    "app_memory_percentiles.anon.d11.csv",
+    "app_memory_percentiles.anon.d12.csv"
+]
+
+# Iterate through the memory files and merge the data into testfile.csv
+for file_name_memory in file_names_memory:
+    file_path_memory = file_name_memory
+    df_memory = pd.read_csv(file_path_memory)
+    df_memory_selected = df_memory[["HashOwner", "HashApp", "AverageAllocatedMb"]]
+    merged_df = pd.read_csv(output_file_path)
+    merged_df = merged_df.merge(df_memory_selected, on=["HashOwner", "HashApp"], how="left")
+    merged_df.rename(columns={"AverageAllocatedMb": f"AverageAllocatedMb{file_name_memory[-7:-4]}"}, inplace=True)
+    merged_df.to_csv(output_file_path, index=False)
+
+# Write the updated DataFrame back to testfile.csv
+merged_df.to_csv(output_file_path, index=False)
+
+
+
+
+###################### Section: Function Durations Percentiles ######################
+
+# Process the files from the "function_durations_percentiles" group
+file_names_function_durations = [
+    "function_durations_percentiles.anon.d01.csv",
+    "function_durations_percentiles.anon.d02.csv",
+    "function_durations_percentiles.anon.d03.csv",
+    "function_durations_percentiles.anon.d04.csv",
+    "function_durations_percentiles.anon.d05.csv",
+    "function_durations_percentiles.anon.d06.csv",
+    "function_durations_percentiles.anon.d07.csv",
+    "function_durations_percentiles.anon.d08.csv",
+    "function_durations_percentiles.anon.d09.csv",
+    "function_durations_percentiles.anon.d10.csv",
+    "function_durations_percentiles.anon.d11.csv",
+    "function_durations_percentiles.anon.d12.csv"
+]
+
+# Iterate through the function durations files and merge the data into testfile.csv
+for file_name_function_durations in file_names_function_durations:
+    file_path_function_durations = file_name_function_durations
+    df_function_durations = pd.read_csv(file_path_function_durations)
+    df_function_durations_selected = df_function_durations[["HashOwner", "HashApp", "HashFunction", "Average"]]
+    merged_df = pd.read_csv(output_file_path)
+    merged_df = merged_df.merge(df_function_durations_selected, on=["HashOwner", "HashApp", "HashFunction"], how="left")
+    merged_df.rename(columns={"Average": f"AverageFunctionExecutionDurationMS{file_name_function_durations[-7:-4]}"}, inplace=True)
+    merged_df.to_csv(output_file_path, index=False)
+
+# Write the updated DataFrame back to testfile.csv
+merged_df.to_csv(output_file_path, index=False)
+
+
+
+
+###################### Section: Intermediate Calculations ######################
+
+# Read the existing testfile.csv
+output_file_path = "testfile.csv"
+df = pd.read_csv(output_file_path)
+
+# Calculate GB-sd01 to GB-sd12 and add them as new columns
+for day in range(1, 13):
+    avg_allocated_mb_col = f"AverageAllocatedMbd{day:02d}"
+    avg_execution_duration_col = f"AverageFunctionExecutionDurationMSd{day:02d}"
+    gb_col = f"GB-sd{day:02d}"
+    df[gb_col] = (df[avg_allocated_mb_col] / 1024) * (df[avg_execution_duration_col] / 1000)
+
+# Write the updated DataFrame back to testfile.csv
+df.to_csv(output_file_path, index=False)
+
+# Read the existing testfile.csv
+output_file_path = "testfile.csv"
+df = pd.read_csv(output_file_path)
+
+# Calculate SumOfGB-s30Days
+sum_of_gb_s30days = 0
+for i in range(1, 13):
+    col_name_invocations = f"SumOfInvocationsd{i:02}"
+    col_name_gb = f"GB-sd{i:02}"
+
+    # Replace NaN with 0 in the columns before calculating the product
+    df[col_name_invocations] = df[col_name_invocations].fillna(0)
+    df[col_name_gb] = df[col_name_gb].fillna(0)
+
+    # Calculate the product and add it to the sum
+    sum_of_gb_s30days += (df[col_name_invocations] * df[col_name_gb] / 12 * 30)
+
+df["SumOfGB-s30Days"] = sum_of_gb_s30days
+
+# Write the updated DataFrame back to testfile.csv
+df.to_csv(output_file_path, index=False)
+
+
+
+
+###################### Section: IaaS Pricing Calculations ######################
+
+# Read the existing testfile.csv
+output_file_path = "testfile.csv"
+merged_df = pd.read_csv(output_file_path)
+
+# Define function to calculate StaticIaaSPricing(USD) based on HighestAverageAllocatedMb_pct100d01d12 value
+def calculate_static_iaas_pricing(row):
+    if row["HighestAverageAllocatedMb_pct100d01d12"] < 8192:
+        return 28.7985
+    elif 8192 <= row["HighestAverageAllocatedMb_pct100d01d12"] < 16384:
+        return 57.5970
+    elif 16384 <= row["HighestAverageAllocatedMb_pct100d01d12"] < 32768:
+        return 115.1867
+    elif 32768 <= row["HighestAverageAllocatedMb_pct100d01d12"] < 65536:
+        return 230.3807
+    else:
+        return None
+
+# Apply the function to create the new column "StaticIaaSPricing(USD)"
+merged_df["StaticIaaSPricing(USD)"] = merged_df.apply(calculate_static_iaas_pricing, axis=1)
+
+# Write the updated DataFrame back to testfile.csv
+merged_df.to_csv(output_file_path, index=False)
+
+
+
+
+###################### Section: Console Readouts ######################
+
+# This section is for cross-checking purposes and can be removed for final code file
+
+print(f"Data has been written to {output_file_path}.")
+
+# Read the existing testfile.csv
+merged_df = pd.read_csv(output_file_path)
+
+# Print all columns and lines without truncation for the first 50 lines
+pd.set_option("display.max_columns", None)
+pd.set_option("display.max_rows", None)
+print(merged_df.head(50).to_string(index=False))
