@@ -1,0 +1,143 @@
+# MAS ETH Applied Technology, Michael Bürgi 08 607 509
+# Master Thesis "Cloud Architecture Paradigms: A Comparative Study of IaaS and FaaS for Workload Performance and Cost"
+
+import pandas as pd
+from collections import defaultdict
+
+
+
+
+###################### Section: File and Dataframe preparation ######################
+
+# Define input filepath (testfile.csv from previous step) and define two output filepaths for HashApp and HashOwner results respectively
+input_file = 'testfile.csv'
+output_file_apps = 'result_apps.csv'  # Output file to store the totals per HashApp
+output_file_owners = 'result_owners.csv'  # Output file to store the totals per HashOwner
+
+# Read the CSV file into a DataFrame
+df = pd.read_csv(input_file)
+
+
+
+
+###################### Section: Defaultdict creation for HashApp level information ######################
+
+# Create defaultdict to store the total SumOfInvocations30Days and SumOfGB-s30Days per HashApp
+totals_per_app = defaultdict(lambda: {'HashOwner': '', 'TotalSumOfInvocations30DaysHashApp': 0, 'TotalSumOfGB-s30DaysHashApp': 0, 'StaticIaaSPricing(USD)Function': 0, 'HashFunctionPerHashApp': 0})
+
+# Loop through the DataFrame and calculate the totals per HashApp for both fields
+for index, row in df.iterrows():
+    hash_owner = row['HashOwner']
+    hash_app = row['HashApp']
+    sum_invocations = row['SumOfInvocations30Days']
+    sum_gb = row['SumOfGB-s30Days']
+    static_iaas_pricing = row['StaticIaaSPricing(USD)']
+
+    # Skip rows where the HashApp is empty (NaN)
+    if pd.notnull(hash_app):
+        totals_per_app[hash_app]['HashOwner'] = hash_owner
+        totals_per_app[hash_app]['TotalSumOfInvocations30DaysHashApp'] += sum_invocations
+        totals_per_app[hash_app]['TotalSumOfGB-s30DaysHashApp'] += sum_gb
+        totals_per_app[hash_app]['StaticIaaSPricing(USD)Function'] = static_iaas_pricing
+        totals_per_app[hash_app]['HashFunctionPerHashApp'] += 1
+
+
+
+
+###################### Section: Defaultdict creation for HashOwner level information ######################
+
+# Create defaultdict to store the total SumOfInvocations30Days and SumOfGB-s30Days per HashOwner
+totals_per_owner = defaultdict(lambda: {'TotalSumOfInvocations30DaysHashOwner': 0, 'TotalSumOfGB-s30DaysHashOwner': 0, 'HashAppPerHashOwner': 0, 'StaticIaaSPricing(USD)Owner': 0, 'TotalSumOfPricedGB-s30DaysHashOwner': 0, 'FaaSInvocationsPricing(USD)Owner': 0, 'TotalSumOfPricedInvocations30DaysHashOwner': 0, 'FaaSGB-sPricing(USD)Owner': 0, 'FaaSTotalPricing(USD)Owner': 0, 'DifferenceIaaSFaaS(USD)Owner': 0})
+
+# Aggregate the totals per HashOwner
+for app, totals in totals_per_app.items():
+    hash_owner = totals['HashOwner']
+    totals_per_owner[hash_owner]['TotalSumOfInvocations30DaysHashOwner'] += totals['TotalSumOfInvocations30DaysHashApp']
+    totals_per_owner[hash_owner]['TotalSumOfGB-s30DaysHashOwner'] += totals['TotalSumOfGB-s30DaysHashApp']
+    totals_per_owner[hash_owner]['HashAppPerHashOwner'] += 1
+    totals_per_owner[hash_owner]['StaticIaaSPricing(USD)Owner'] += totals['StaticIaaSPricing(USD)Function']
+
+
+
+
+###################### Section: Pricing Input and Pricing Calculations ######################
+
+# Calculate the TotalSumOfPricedGB-s30DaysHashOwner by subtracting 400000 free GB-s
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['TotalSumOfPricedGB-s30DaysHashOwner'] = max(0, totals['TotalSumOfGB-s30DaysHashOwner'] - 400000)
+
+# Calculate TotalSumOfPricedInvocations30DaysHashOwner by subtracting 1000000 free executions
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['TotalSumOfPricedInvocations30DaysHashOwner'] = max(0, totals['TotalSumOfInvocations30DaysHashOwner'] - 1000000)
+
+# Calculate FaaSInvocationsPricing(USD)Owner by dividing TotalSumOfPricedInvocations30DaysHashOwner by one million and multiplying by 0.2
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['FaaSInvocationsPricing(USD)Owner'] = (totals['TotalSumOfPricedInvocations30DaysHashOwner'] / 1000000) * 0.2
+
+# Calculate FaaSGB-sPricing(USD)Owner by multiplying TotalSumOfPricedGB-s30DaysHashOwner by 0.000016
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['FaaSGB-sPricing(USD)Owner'] = totals['TotalSumOfPricedGB-s30DaysHashOwner'] * 0.000016
+
+# Calculate FaaSTotalPricing(USD)Owner by summing FaaSInvocationsPricing(USD)Owner and FaaSGB-sPricing(USD)Owner
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['FaaSTotalPricing(USD)Owner'] = totals['FaaSInvocationsPricing(USD)Owner'] + totals['FaaSGB-sPricing(USD)Owner']
+
+# Calculate DifferenceIaaSFaaS(USD)Owner by subtracting FaaSTotalPricing(USD)Owner from StaticIaaSPricing(USD)Owner
+for owner, totals in totals_per_owner.items():
+    totals_per_owner[owner]['DifferenceIaaSFaaS(USD)Owner'] = totals['StaticIaaSPricing(USD)Owner'] - totals['FaaSTotalPricing(USD)Owner']
+
+
+
+
+###################### Section: Dataframe conversion from Defaultdict for HashApp and HashOwner level information ######################
+
+# Convert the defaultdict to a list of dictionaries for creating a new DataFrame for HashApps
+result_data_apps = [{'HashOwner': totals['HashOwner'],
+                     'HashApp': app,
+                     'TotalSumOfInvocations30DaysHashApp': totals['TotalSumOfInvocations30DaysHashApp'],
+                     'TotalSumOfGB-s30DaysHashApp': totals['TotalSumOfGB-s30DaysHashApp'],
+                     'StaticIaaSPricing(USD)Function': totals['StaticIaaSPricing(USD)Function'],
+                     'HashFunctionPerHashApp': totals['HashFunctionPerHashApp']}
+                    for app, totals in totals_per_app.items()]
+
+# Convert the defaultdict to a list of dictionaries for creating a new DataFrame for HashOwners
+result_data_owners = [{'HashOwner': owner,
+                       'TotalSumOfInvocations30DaysHashOwner': totals['TotalSumOfInvocations30DaysHashOwner'],
+                       'TotalSumOfGB-s30DaysHashOwner': totals['TotalSumOfGB-s30DaysHashOwner'],
+                       'HashAppPerHashOwner': totals['HashAppPerHashOwner'],
+                       'StaticIaaSPricing(USD)Owner': totals['StaticIaaSPricing(USD)Owner'],
+                       'TotalSumOfPricedGB-s30DaysHashOwner': totals['TotalSumOfPricedGB-s30DaysHashOwner'],
+                       'FaaSInvocationsPricing(USD)Owner': totals['FaaSInvocationsPricing(USD)Owner'],
+                       'TotalSumOfPricedInvocations30DaysHashOwner': totals['TotalSumOfPricedInvocations30DaysHashOwner'],
+                       'FaaSGB-sPricing(USD)Owner': totals['FaaSGB-sPricing(USD)Owner'],
+                       'FaaSTotalPricing(USD)Owner': totals['FaaSTotalPricing(USD)Owner'],
+                       'DifferenceIaaSFaaS(USD)Owner': totals['DifferenceIaaSFaaS(USD)Owner']}
+                      for owner, totals in totals_per_owner.items()]
+
+# Create new DataFrames with the results for HashApps and HashOwners
+result_df_apps = pd.DataFrame(result_data_apps)
+result_df_owners = pd.DataFrame(result_data_owners)
+
+# Write the results to new CSV files for HashApps and HashOwners
+result_df_apps.to_csv(output_file_apps, index=False)
+result_df_owners.to_csv(output_file_owners, index=False)
+
+
+
+
+###################### Section: Console Readouts ######################
+
+# This section is for cross-checking purposes and can be removed for final code file
+
+# Set the display options to show all columns and full values without truncation
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', None)
+
+# Display the first 20 lines of the 'result.csv' file for HashApps and HashOwners each
+print("Results for HashApps:")
+print(result_df_apps.head(20))
+
+print("\nResults for HashOwners:")
+print(result_df_owners.head(20))
